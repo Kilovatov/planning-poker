@@ -1,0 +1,172 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Planning Poker</title>
+  <link rel="icon" href="assets/favicon.png">
+  <style>
+    :root{
+      --bg:#0b1020;
+      --panel:#121a32;
+      --muted:#9aa3b2;
+      --text:#e9eef5;
+      --primary:#6ea8fe;
+      --accent:#7bd389;
+      --warn:#ffd166;
+      --danger:#ff6b6b;
+      --shadow: 0 10px 30px rgba(0,0,0,.35);
+      --radius:20px;
+    }
+    *{box-sizing:border-box}
+    html,body{height:100%}
+    body{
+      margin:0;
+      font-family: ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial, "Apple Color Emoji", "Segoe UI Emoji";
+      color:var(--text);
+      background: radial-gradient(1200px 800px at 20% -10%, #1a2448 0%, #0b1020 40%, #0b1020 100%);
+      display:flex; flex-direction:column; align-items:center;
+      padding:24px;
+    }
+    .app{width:100%; max-width:1100px}
+    header{
+      display:flex; align-items:center; justify-content:space-between;
+      gap:16px; margin-bottom:16px;
+    }
+    header .title{
+      font-weight:800; letter-spacing:.4px; font-size:22px;
+      display:flex; align-items:center; gap:10px;
+    }
+    .badge{font-size:12px; background:#1e2a4d; padding:6px 10px; border-radius:999px; color:#bcd3ff; border:1px solid #2b3964}
+    .panel{
+      background:linear-gradient(180deg, rgba(255,255,255,0.02), rgba(255,255,255,0));
+      border:1px solid rgba(255,255,255,0.08);
+      border-radius:var(--radius);
+      box-shadow:var(--shadow);
+      backdrop-filter: blur(4px);
+    }
+    .room-bar{
+      padding:12px 14px; display:flex; align-items:center; gap:12px; flex-wrap:wrap;
+    }
+    .room-id{font-weight:700; color:#bcd3ff}
+    .controls{margin-left:auto; display:flex; gap:8px; flex-wrap:wrap}
+    button, input, select{
+      background:#182241; border:1px solid #26335f; color:var(--text);
+      padding:10px 12px; border-radius:12px; font-size:14px;
+    }
+    button{cursor:pointer; transition: transform .04s ease, background .2s ease}
+    button:hover{transform: translateY(-1px)}
+    .primary{background:#223468; border-color:#33509e}
+    .accent{background:#1f3a2a; border-color:#2a5e3d}
+    .danger{background:#3a2222; border-color:#6b2d2d}
+    .grid{
+      display:grid; gap:14px; grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));
+      margin-top:16px;
+    }
+    .card{
+      aspect-ratio: 7/9;
+      border-radius:18px; border:1px solid rgba(255,255,255,.08);
+      background:#11172c; display:flex; align-items:center; justify-content:center;
+      font-weight:800; font-size:28px; letter-spacing:.5px;
+      box-shadow: var(--shadow); position:relative;
+      user-select:none;
+    }
+    .card small{
+      position:absolute; top:8px; left:10px; opacity:.6; font-size:12px; font-weight:600;
+    }
+    .card.selected{outline:2px solid var(--primary); background:#172043}
+    .stack{padding:18px}
+    .stack h3{margin:0 0 12px 0; font-size:16px; color:#c8d2ea}
+    .list{display:flex; flex-direction:column; gap:10px}
+    .person{
+      display:flex; align-items:center; justify-content:space-between;
+      gap:10px; padding:10px 12px; border-radius:12px; border:1px solid rgba(255,255,255,.08); background:#0f152b;
+    }
+    .dot{width:10px; height:10px; border-radius:50%; background:#6be675; box-shadow:0 0 10px rgba(107,230,117,.45)}
+    .dot.away{background:#b3b3b3; box-shadow:none}
+    .vote{
+      font-weight:800; color:#bcd3ff; background:#111a34; padding:4px 10px; border-radius:10px; border:1px solid #273258; min-width:40px; text-align:center;
+    }
+    .hidden-vote{filter: blur(6px);}
+    .stats{
+      display:flex; gap:10px; flex-wrap:wrap;
+    }
+    .stat{
+      background:#0f172e; border:1px solid #23305c; border-radius:14px; padding:10px 12px; min-width:110px;
+    }
+    .footer{margin-top:22px; opacity:.7; font-size:12px}
+    .row{display:flex; gap:8px; flex-wrap:wrap; align-items:center}
+    .input{display:flex; gap:6px; align-items:center}
+    input[type="text"]{min-width:160px}
+    dialog::backdrop{background: rgba(0,0,0,.5)}
+    dialog{border:none; border-radius:16px; padding:0; overflow:hidden}
+    .modal{background:#0b1020; padding:16px; min-width:280px}
+    .modal h3{margin:0 0 8px 0}
+    .table{width:100%; border-collapse: collapse; margin-top:8px}
+    .table td, .table th{border-bottom:1px solid #223; padding:8px; text-align:left; font-size:14px}
+    .pill{background:#172043; border:1px solid #2a3d75; border-radius:999px; padding:3px 8px; font-size:12px}
+    a{color:#9dc1ff}
+  </style>
+</head>
+<body>
+  <div class="app">
+    <header>
+      <div class="title">
+        🃏 Planning Poker
+        <span class="badge">GH Pages-ready</span>
+      </div>
+      <div class="row">
+        <span class="pill" id="status">offline</span>
+      </div>
+    </header>
+
+    <div class="panel room-bar">
+      <div>Room: <span class="room-id" id="roomIdLabel"></span></div>
+      <div class="input">
+        <label for="displayName">Name</label>
+        <input id="displayName" type="text" placeholder="Your name"/>
+        <button id="saveNameBtn" title="Save name">Save</button>
+      </div>
+      <div class="controls">
+        <button class="primary" id="createRoomBtn">New Room</button>
+        <button id="copyLinkBtn">Copy Link</button>
+        <button class="accent" id="revealBtn">Reveal</button>
+        <button class="danger" id="resetBtn" title="Clear all votes in room">Reset</button>
+        <button id="manualEvalBtn" title="Manually enter votes for people who can't vote">Manual Evaluate</button>
+      </div>
+    </div>
+
+    <main class="grid">
+      <section class="panel stack" style="grid-column: span 2;">
+        <h3>Pick a card</h3>
+        <div id="cards" class="grid"></div>
+      </section>
+
+      <section class="panel stack">
+        <h3>Participants</h3>
+        <div class="list" id="participants"></div>
+      </section>
+
+      <section class="panel stack">
+        <h3>Results</h3>
+        <div class="stats">
+          <div class="stat"><div>Min</div><div id="minVal" style="font-weight:800; font-size:20px">—</div></div>
+          <div class="stat"><div>Avg</div><div id="avgVal" style="font-weight:800; font-size:20px">—</div></div>
+          <div class="stat"><div>Max</div><div id="maxVal" style="font-weight:800; font-size:20px">—</div></div>
+        </div>
+        <div class="footer">Stats ignore ☕ and ∞</div>
+      </section>
+    </main>
+
+    <div class="footer">Tip: share the link (it includes the room id). Votes stay hidden until you <b>Reveal</b> or everyone has voted.</div>
+  </div>
+
+  <!-- Firebase config is expected in config.js as window.FIREBASE_CONFIG -->
+  <script src="config.js"></script>
+  <!-- Firebase SDKs (modular) -->
+  <script src="https://www.gstatic.com/firebasejs/10.12.5/firebase-app-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/10.12.5/firebase-auth-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/10.12.5/firebase-firestore-compat.js"></script>
+  <script src="script.js"></script>
+</body>
+</html>
