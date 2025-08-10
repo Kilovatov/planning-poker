@@ -4,6 +4,11 @@ on:
   push:
     branches: [ main ]
 
+# Avoid overlapping deploys
+concurrency:
+  group: "pages"
+  cancel-in-progress: true
+
 permissions:
   contents: read
   pages: write
@@ -16,10 +21,14 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
-      # Create config.js from secrets (not committed to the repo)
-      - name: Generate Firebase config
+      # Create config.js from GitHub Secrets (kept out of the repo)
+      - name: Generate Firebase config.js
+        shell: bash
         run: |
-          cat > config.js << 'EOF'
+          set -euo pipefail
+
+          # Write base config (without measurementId)
+          cat > config.js <<'EOF'
           window.FIREBASE_CONFIG = {
             apiKey: "${{ secrets.FIREBASE_API_KEY }}",
             authDomain: "${{ secrets.FIREBASE_AUTH_DOMAIN }}",
@@ -30,11 +39,32 @@ jobs:
           };
           EOF
 
-      # Package static site for Pages
+          # Optionally append measurementId if provided
+          if [ -n "${{ secrets.FIREBASE_MEASUREMENT_ID || '' }}" ]; then
+            # Rebuild with the optional field
+            cat > config.js <<'EOF'
+            window.FIREBASE_CONFIG = {
+              apiKey: "${{ secrets.FIREBASE_API_KEY }}",
+              authDomain: "${{ secrets.FIREBASE_AUTH_DOMAIN }}",
+              projectId: "${{ secrets.FIREBASE_PROJECT_ID }}",
+              storageBucket: "${{ secrets.FIREBASE_STORAGE_BUCKET }}",
+              messagingSenderId: "${{ secrets.FIREBASE_MESSAGING_SENDER_ID }}",
+              appId: "${{ secrets.FIREBASE_APP_ID }}",
+              measurementId: "${{ secrets.FIREBASE_MEASUREMENT_ID }}"
+            };
+            EOF
+          fi
+
+          echo "---- repo root listing ----"
+          ls -la
+          echo "---- print first lines of config.js ----"
+          head -n 20 config.js
+
+      # Upload the current directory (including config.js) as the Pages artifact
       - name: Upload artifact
         uses: actions/upload-pages-artifact@v3
         with:
-          path: .  # index.html, script.js, and the generated config.js
+          path: .
 
   deploy:
     needs: build
