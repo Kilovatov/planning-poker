@@ -12,6 +12,13 @@
     const roomIdLabel = $('roomIdLabel');
     const statusPill = $('status');
     let _roomReveal = false;
+    const qrBtn = $('qrBtn');
+
+    function roomLink() {
+        if (!roomId) return null;
+        return location.origin + location.pathname + `?room=${encodeURIComponent(roomId)}`;
+    }
+
 
     function randomRoomId() {
         return Math.random().toString(36).slice(2, 8);
@@ -373,6 +380,54 @@
             updateStats();
         };
     }
+
+    function openQRDialog() {
+        const link = roomLink();
+        if (!link) {
+            alert('Create or join a room first, then open the QR.');
+            return;
+        }
+
+        const dlg = document.createElement('dialog');
+        const wrap = document.createElement('div');
+        wrap.className = 'modal';
+        wrap.innerHTML = `
+    <h3>Join via QR</h3>
+    <div id="qrContainer" style="display:flex; justify-content:center; padding:12px;"></div>
+    <div style="margin-top:10px; word-break:break-all; font-size:12px; opacity:.8;">${link}</div>
+    <div class="row" style="margin-top:12px; justify-content:flex-end">
+      <button id="qrCopy">Copy link</button>
+      <button class="accent" id="qrClose">Close</button>
+    </div>
+  `;
+        dlg.appendChild(wrap);
+        document.body.appendChild(dlg);
+        dlg.showModal();
+
+        // Generate QR
+        const container = wrap.querySelector('#qrContainer');
+        // Clear any previous content (defensive)
+        container.innerHTML = '';
+        // Use the QRCode.js library loaded in index.html
+        new QRCode(container, {
+            text: link,
+            width: 220,
+            height: 220,
+            correctLevel: QRCode.CorrectLevel.M
+        });
+
+        // Buttons
+        wrap.querySelector('#qrCopy').onclick = async () => {
+            await navigator.clipboard.writeText(link);
+            wrap.querySelector('#qrCopy').textContent = 'Copied!';
+            setTimeout(() => wrap.querySelector('#qrCopy').textContent = 'Copy link', 1200);
+        };
+        wrap.querySelector('#qrClose').onclick = () => dlg.close();
+        dlg.addEventListener('close', () => dlg.remove());
+    }
+
+    qrBtn.onclick = openQRDialog;
+
 
     // Initial mount
     function init() {
